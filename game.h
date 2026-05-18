@@ -1,12 +1,16 @@
+#pragma once
 
-#ifndef GAME_H
-#define GAME_H
-
-
+typedef enum {
+    IZLAZ = 0,
+    CREATE_INSERT,   // C & I: Pokretanje nove igre i insert novih igraca u bazu
+    READ_STATS,      // R: Citanje i pregled ljestvice s qsortom
+    UPDATE_RECORD,   // U: Rucno azuriranje/izmjena statistike nekog igraca
+    DELETE_PLAYER    // D: Brisanje igraca iz datoteke
+} MenuOpcija;
 
 typedef struct {
     char ime[50];
-    int pobjede;
+    int pobjede;     // [Koncept 2: Primitivni tipovi podataka - cijeli brojevi]
     int porazi;
     int odigrano;
 } IgracStatistika;
@@ -18,5 +22,3 @@ typedef struct {
 } TrenutniRezultat;
 
 void play_game();
-
-#endif
