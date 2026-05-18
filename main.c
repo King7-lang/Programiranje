@@ -4,59 +4,74 @@
 #include "game.h"
 #include "file_handler.h"
 
-// Definiranje enumeracije za opcije izbornika
-// IZLAZ dobiva vrijednost 0, NOVA_IGRA 1, i tako dalje
-typedef enum {
-    IZLAZ = 0,
-    NEW_GAME,
-    RANKING_OVERVIEW,
-    DELETE_PLAYER
-} MenuOpcija;
-
 int main() {
     int input;
-    MenuOpcija choice;
 
+    MenuOpcija choice = CREATE_INSERT;
+
+    // [Koncept 10: Izbornik / podizbornici preko petlje]
     do {
-        printf("\n--- KRIZIC KRUZIC ---\n");
-        printf("%d. New game\n", NEW_GAME);
-        printf("%d. Pregled ljestvice\n", RANKING_OVERVIEW);
-        printf("%d. Delete player\n", DELETE_PLAYER);
-        printf("%d. Exit\n", IZLAZ);
+        // Vizualno uredenje glavnog izbornika pomocu ANSI boja
+        printf("\n\033[1;33m=====================================\033[0m\n");
+        printf("\033[1;36m       KRIZIC KRUZIC          \033[0m\n");
+        printf("\033[1;33m=====================================\033[0m\n");
+        printf("\033[1;32m 1.\033[0m New game\n");
+        printf("\033[1;32m 2.\033[0m Ranking overview\n");
+        printf("\033[1;32m 3.\033[0m Update player\n");
+        printf("\033[1;32m 4.\033[0m Delete player\n");
+        printf("\033[1;31m 0.\033[0m Exit\n");
+        printf("\033[1;33m-------------------------------------\033[0m\n");
         printf("Choice: ");
 
-   
         if (scanf("%d", &input) != 1) {
             while (getchar() != '\n');
             continue;
         }
 
-        // Cast-anje (pretvorba) int unosa u našu MenuOpcija enumeraciju
         choice = (MenuOpcija)input;
 
+        // [Koncept 11: Kod izbornika koristiti enum tipove unutar switch-a]
         switch (choice) {
-        case NEW_GAME:
+        case CREATE_INSERT:
             play_game();
             break;
 
-        case RANKING_OVERVIEW:
+        case READ_STATS:
+            system("cls"); // Cisti ekran prije ispisa ljestvice radi preglednosti
             display_results();
             break;
 
+        case UPDATE_RECORD: {
+            char ime_za_update[50];
+            int broj_pobjeda;
+
+            printf("\nUnesi ime igraca kojem zelis izmijeniti statistiku: ");
+            scanf("%s", ime_za_update);
+
+            printf("Unesi NOVI ukupan broj pobjeda za ovog igraca: ");
+            scanf("%d", &broj_pobjeda);
+
+            
+            rucni_update_pobjeda(ime_za_update, broj_pobjeda);
+            break;
+        }
+
         case DELETE_PLAYER:
+            system("cls");
             display_results();
             int idx;
-            printf("Unesi redni broj igraca za brisanje: ");
+            printf("\nUnesi redni broj igraca za brisanje: ");
             scanf("%d", &idx);
+            // [Koncept 1: D u CRUID - Delete zapisa iz datoteke]
             delete_single_result(idx);
             break;
 
         case IZLAZ:
-            printf("Izlaz iz programa...\n");
+            printf("\n\033[1;31mIzlaz iz programa...\033[0m\n");
             break;
 
         default:
-            printf("Nevazeci odabir! Pokusajte ponovo.\n");
+            printf("\n\033[1;31mNevazeci odabir! Pokusajte ponovo.\033[0m\n");
             break;
         }
 
