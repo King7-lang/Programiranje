@@ -4,14 +4,42 @@
 #include <string.h>
 #include "file_handler.h"
 
+// [Koncept 4: Primjena typedef s enum tipovima]
 typedef enum { GUBITAK, POBJEDA, REMI } Ishod;
 
-// Pomocna funkcija za azuriranje – dodan 'const' za zastitu parametra (Stavka 14)
+// [Koncept 16: Koristiti dinamicko zauzimanje memorije za slozene tipove]
+static IgracStatistika* ucitaj_sve_igrace(int* broj_igraca) {
+    FILE* fp = fopen("igraci.bin", "rb");
+    if (!fp) return NULL;
+
+    IgracStatistika* ljestvica = NULL, temp;
+    *broj_igraca = 0;
+
+    while (fread(&temp, sizeof(IgracStatistika), 1, fp)) {
+        // [Koncept 17: Koristiti ugradenu funkciju realloc()]
+        IgracStatistika* ptr = (IgracStatistika*)realloc(ljestvica, (*broj_igraca + 1) * sizeof(IgracStatistika));
+        if (!ptr) {
+            perror("Greska pri alokaciji");
+            free(ljestvica);
+            fclose(fp);
+            return NULL;
+        }
+        ljestvica = ptr;
+        ljestvica[(*broj_igraca)++] = temp;
+    }
+    fclose(fp);
+    return ljestvica;
+}
+
+// [Koncept 6: Primjena kljucne rijeci static]
+// [Koncept 14: Zastita parametara koristenjem kljucne rijeci const]
 static void azuriraj_ili_dodaj(const char* ime, Ishod ishod) {
+    // [Koncept 19: Datoteke - otvaranje binarne datoteke u rb+ modu]
     FILE* fp = fopen("igraci.bin", "rb+");
     IgracStatistika temp;
     int pronaden = 0;
 
+    // [Koncept 19: Obavezna provjera pokazivaca na datoteku prije koristenja]
     if (fp != NULL) {
         while (fread(&temp, sizeof(IgracStatistika), 1, fp)) {
             if (strcmp(temp.ime, ime) == 0) {
@@ -19,142 +47,137 @@ static void azuriraj_ili_dodaj(const char* ime, Ishod ishod) {
                 if (ishod == POBJEDA) temp.pobjede++;
                 else if (ishod == GUBITAK) temp.porazi++;
 
+                // [Koncept 20: Koristiti funkciju fseek za pozicioniranje u datoteci]
                 fseek(fp, -(long)sizeof(IgracStatistika), SEEK_CUR);
                 fwrite(&temp, sizeof(IgracStatistika), 1, fp);
                 pronaden = 1;
                 break;
             }
         }
-        fclose(fp);
+        fclose(fp); // [Koncept 19: Obavezno zatvaranje datoteke]
     }
 
+    // [Koncept 1: C & I u CRUID - Kreiranje novog zapisa ako ne postoji u bazi]
     if (!pronaden) {
-        fp = fopen("igraci.bin", "ab");
-        if (fp == NULL) {
-            perror("Greska pri otvaranju datoteke za dodavanje"); // Upravljanje pogreskama (Stavka 22)
+        if (!(fp = fopen("igraci.bin", "ab"))) {
+            // [Koncept 22: Upravljati pogreskama koristenjem perror()]
+            perror("Greska pri otvaranju datoteke");
             return;
         }
         strcpy(temp.ime, ime);
         temp.odigrano = 1;
-        temp.pobjede = (ishod == POBJEDA) ? 1 : 0;
-        temp.porazi = (ishod == GUBITAK) ? 1 : 0;
+        temp.pobjede = (ishod == POBJEDA);
+        temp.porazi = (ishod == GUBITAK);
         fwrite(&temp, sizeof(IgracStatistika), 1, fp);
         fclose(fp);
     }
 }
 
+// [Koncept 14: Zastita parametara strukture koristenjem kljucne rijeci const]
 void save_result(const TrenutniRezultat* res) {
-    if (res == NULL) return;
-    Ishod ishod1, ishod2;
+    if (!res) return;
+    int izjednaceno = (strcmp(res->winner, "Izjednaceno") == 0);
+    int p1_pobjednik = (strcmp(res->winner, res->player1) == 0);
 
-    if (strcmp(res->winner, "Izjednaceno") == 0) {
-        ishod1 = ishod2 = REMI;
-    }
-    else if (strcmp(res->winner, res->player1) == 0) {
-        ishod1 = POBJEDA; ishod2 = GUBITAK;
-    }
-    else {
-        ishod1 = GUBITAK; ishod2 = POBJEDA;
-    }
-
-    azuriraj_ili_dodaj(res->player1, ishod1);
-    azuriraj_ili_dodaj(res->player2, ishod2);
+    azuriraj_ili_dodaj(res->player1, izjednaceno ? REMI : (p1_pobjednik ? POBJEDA : GUBITAK));
+    azuriraj_ili_dodaj(res->player2, izjednaceno ? REMI : (p1_pobjednik ? GUBITAK : POBJEDA));
 }
 
-// Funkcija usporedbe za qsort – sortira silazno prema broju pobjeda (Stavka 23 i 26)
 static int usporedi_pobjede(const void* a, const void* b) {
-    const IgracStatistika* igracA = (const IgracStatistika*)a;
-    const IgracStatistika* igracB = (const IgracStatistika*)b;
-    return (igracB->pobjede - igracA->pobjede);
+    return (((const IgracStatistika*)b)->pobjede - ((const IgracStatistika*)a)->pobjede);
 }
 
 void display_results() {
-    FILE* fp = fopen("igraci.bin", "rb");
-    if (fp == NULL) {
-        printf("Nema spremljenih podataka o igracima.\n");
+    int broj_igraca;
+    IgracStatistika* ljestvica = ucitaj_sve_igrace(&broj_igraca);
+
+    if (!ljestvica || broj_igraca == 0) {
+        printf("\033[1;31mNema spremljenih podataka ili je datoteka prazna.\033[0m\n");
         return;
     }
 
-    // Dinamicki ucitavamo sve igrace u memoriju kako bismo ih mogli sortirati
-    IgracStatistika* ljestvica = NULL;
-    IgracStatistika temp;
-    int broj_igraca = 0;
-
-    while (fread(&temp, sizeof(IgracStatistika), 1, fp)) {
-        IgracStatistika* ptr = (IgracStatistika*)realloc(ljestvica, (broj_igraca + 1) * sizeof(IgracStatistika));
-        if (ptr == NULL) {
-            perror("Greska pri alokaciji memorije");
-            free(ljestvica);
-            fclose(fp);
-            return;
-        }
-        ljestvica = ptr;
-        ljestvica[broj_igraca++] = temp;
-    }
-    fclose(fp);
-
-    if (broj_igraca == 0) {
-        printf("Datoteka je prazna.\n");
-        return;
-    }
-
-    // Poziv ugradene qsort funkcije za sortiranje ljestvice (Stavka 23)
+    // [Koncept 23: Sortiranje – obavezna primjena ugradene qsort() funkcije]
+    // [Koncept 26: Pokazivaci na funkcije - predavanje funkcije kao argumenta]
     qsort(ljestvica, broj_igraca, sizeof(IgracStatistika), usporedi_pobjede);
 
-    printf("\n--- LJESTVICA IGRACA (SORTIRANO PO POBJEDAMA) ---\n");
+    // Plavo-bijeli dizajn tablice rezultata
+    printf("\n\033[1;34m------------------------------------------------------\033[0m\n");
+    printf("\033[1;36m       LJESTVICA IGRACA (SORTIRANO PO POBJEDAMA)      \033[0m\n");
+    printf("\033[1;34m------------------------------------------------------\033[0m\n");
     printf("Br. | %-15s | Pobjede | Porazi | Odigrano\n", "Ime");
     printf("------------------------------------------------------\n");
     for (int i = 0; i < broj_igraca; i++) {
-        printf("%d.  | %-15s | %7d | %6d | %8d\n",
+        printf("\033[1;32m%2d.\033[0m  | %-15s | %7d | %6d | %8d\n",
             i + 1, ljestvica[i].ime, ljestvica[i].pobjede, ljestvica[i].porazi, ljestvica[i].odigrano);
     }
+    printf("\033[1;34m------------------------------------------------------\033[0m\n");
 
     free(ljestvica);
-    ljestvica = NULL; // Sigurno nuliranje pokazivaca (Stavka 18)
+    // [Koncept 18: Sigurno brisanje memorije - anuliranje pokazivaca na NULL]
+    ljestvica = NULL;
 }
 
 void delete_single_result(int index) {
-    FILE* fp = fopen("igraci.bin", "rb");
-    if (fp == NULL) {
-        perror("Greska pri otvaranju datoteke za brisanje");
+    int count;
+    IgracStatistika* data = ucitaj_sve_igrace(&count);
+
+    if (!data) {
+        printf("Nema podataka za brisanje.\n");
         return;
     }
 
-    IgracStatistika* data = NULL;
-    int count = 0;
-    IgracStatistika temp;
-
-    while (fread(&temp, sizeof(IgracStatistika), 1, fp)) {
-        IgracStatistika* ptr = (IgracStatistika*)realloc(data, (count + 1) * sizeof(IgracStatistika));
-        if (ptr == NULL) {
-            perror("Greska pri realokaciji");
-            free(data);
-            fclose(fp);
-            return;
-        }
-        data = ptr;
-        data[count++] = temp;
-    }
-    fclose(fp);
-
+    // [Koncept 1: D u CRUID - Potpuno brisanje odabranog zapisa]
     if (index >= 1 && index <= count) {
-        fp = fopen("igraci.bin", "wb");
+        FILE* fp = fopen("igraci.bin", "wb");
         if (fp != NULL) {
             for (int i = 0; i < count; i++) {
                 if (i == index - 1) continue;
                 fwrite(&data[i], sizeof(IgracStatistika), 1, fp);
             }
             fclose(fp);
-            printf("Igrac uspjesno obrisan.\n");
+            printf("\033[1;32mIgrac uspjesno obrisan s ljestvice.\033[0m\n");
         }
         else {
-            perror("Greska pri upisivanju nakon brisanja");
+            perror("Greska pri upisu nakon brisanja");
         }
     }
     else {
-        printf("Nevazeci redni broj!\n");
+        printf("\033[1;31mNevazeci redni broj!\033[0m\n");
     }
 
     free(data);
-    data = NULL; // Sigurno nuliranje pokazivaca (Stavka 18)
+    // [Koncept 18: Anuliranje pokazivaca na NULL]
+    data = NULL;
+}
+
+// [Koncept 1: U u CRUID - Rucni Update odabranog polja unutar postojece strukture]
+void rucni_update_pobjeda(const char* ime, int nove_pobjede) {
+    // [Koncept 19: Rad s binarnim datotekama kroz citanje i pisanje "rb+"]
+    FILE* fp = fopen("igraci.bin", "rb+");
+    if (!fp) {
+        printf("\033[1;31mDatoteka ne postoji ili se ne moze otvoriti.\033[0m\n");
+        return;
+    }
+
+    IgracStatistika temp;
+    int pronaden = 0;
+
+    while (fread(&temp, sizeof(IgracStatistika), 1, fp)) {
+        if (strcmp(temp.ime, ime) == 0) {
+            temp.pobjede = nove_pobjede;
+            if (temp.pobjede > temp.odigrano) {
+                temp.odigrano = temp.pobjede + temp.porazi;
+            }
+
+            // [Koncept 20: Koristiti funkciju fseek za vracanje pozicije unatrag]
+            fseek(fp, -(long)sizeof(IgracStatistika), SEEK_CUR);
+            fwrite(&temp, sizeof(IgracStatistika), 1, fp);
+            pronaden = 1;
+            printf("\033[1;32mStatistika za igraca '%s' je rucno postavljena na %d pobjeda!\033[0m\n", ime, nove_pobjede);
+            break;
+        }
+    }
+
+    if (!pronaden) printf("\033[1;31mIgrac '%s' nije pronaden u bazi.\033[0m\n", ime);
+    fclose(fp);
 }
