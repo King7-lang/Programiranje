@@ -13,11 +13,7 @@
 #define SLEEP_MS(ms) usleep((ms) * 1000)
 #endif
 
-// [Koncept 5: Konzistentno imenovanje - snake_case za funkcije i varijable]
-// [Koncept 6: Primjena kljucne rijeci static za funkcije]
-// [Koncept 12: Umjesto VLA polja, koristi se cisti pokazivac na pokazivac (char**)]
-// [Savjet 2: Funkcija mora biti kratka i konkretna - samo crta plocu]
-static void nacrtaj_plocu(char** ploca) {
+static void nacrtaj_plocu(const char* const* ploca) {
     system("cls"); // Cisti konzolu radi vizualnog osvjezavanja
 
     printf("\n\033[1;36m=== KRIZIC KRUZIC ===\033[0m\n");
@@ -25,7 +21,6 @@ static void nacrtaj_plocu(char** ploca) {
     for (int i = 0; i < 3; i++) {
         printf(" %d \033[1;33m|\033[0m ", i);
         for (int j = 0; j < 3; j++) {
-            // Pristup preko pokazivaca: ploca[i][j] je isto sto i *(*(ploca + i) + j)
             if (ploca[i][j] == 'X') {
                 printf("\033[1;31mX\033[0m");
             }
@@ -45,8 +40,8 @@ static void nacrtaj_plocu(char** ploca) {
 }
 
 // [Koncept 6: Primjena kljucne rijeci static za funkcije]
-// [Koncept 12: Prosljedivanje pokazivaca na pokazivac za provjeru matrice]
-static int provjeri_pobjednika(char** ploca) {
+// [Koncept 14: Osiguranje parametara matrice pomocu kljucne rijeci const]
+static int provjeri_pobjednika(const char* const* ploca) {
     for (int i = 0; i < 3; i++) {
         if (ploca[i][0] != ' ' && ploca[i][0] == ploca[i][1] && ploca[i][1] == ploca[i][2]) return 1;
         if (ploca[0][i] != ' ' && ploca[0][i] == ploca[1][i] && ploca[1][i] == ploca[2][i]) return 1;
@@ -62,13 +57,11 @@ void play_game() {
     char trenutni_znak = 'X';
 
     // [Koncept 16: Dinamicko zauzimanje memorije za dvodimenzionalno polje preko char**]
-    // Prvo alociramo niz od 3 pokazivaca na char (retke)
     char** ploca = (char**)malloc(3 * sizeof(char*));
     if (ploca == NULL) {
         perror("Greska pri alokaciji redaka ploce");
         return;
     }
-    // Zatim za svaki redak alociramo 3 stupca i inicijaliziramo ih na prazno mjesto ' '
     for (int i = 0; i < 3; i++) {
         ploca[i] = (char*)malloc(3 * sizeof(char));
         if (ploca[i] == NULL) {
@@ -88,8 +81,9 @@ void play_game() {
     printf("Player name 2 (\033[1;34mO\033[0m): "); scanf("%s", res.player2);
 
     while (potezi < 9) {
-        nacrtaj_plocu(ploca);
-        char* aktivan = (trenutni_znak == 'X') ? res.player1 : res.player2;
+        // Ovdje predajemo char** u funkciju koja prima const char* const* - kompajler to sigurno prosljeduje
+        nacrtaj_plocu((const char* const*)ploca);
+        const char* aktivan = (trenutni_znak == 'X') ? res.player1 : res.player2;
 
         if (trenutni_znak == 'X') {
             printf("Igrac \033[1;31m%s (X)\033[0m, unesi red i stupac (npr. 0 1): ", aktivan);
@@ -114,37 +108,32 @@ void play_game() {
         ploca[red][stup] = trenutni_znak;
         potezi++;
 
-        if (provjeri_pobjednika(ploca)) {
-            nacrtaj_plocu(ploca);
+        if (provjeri_pobjednika((const char* const*)ploca)) {
+            nacrtaj_plocu((const char* const*)ploca);
             strcpy(res.winner, aktivan);
 
             printf("\n\033[1;32m***************************************\033[0m\n");
             printf("\033[1;32m     POBJEDNIK JE: %s!          \033[0m\n", res.winner);
             printf("\033[1;32m***************************************\033[0m\n");
 
-            // [Koncept 12: Generalna upotreba pokazivaca]
             save_result(&res);
 
-            // [Koncept 17: Obavezno oslobadanje dinamicki alocirane 2D matrice s free()]
             for (int i = 0; i < 3; i++) free(ploca[i]);
             free(ploca);
-            // [Koncept 18: Sigurno anuliranje pokazivaca na NULL]
             ploca = NULL;
             return;
         }
         trenutni_znak = (trenutni_znak == 'X') ? 'O' : 'X';
     }
 
-    nacrtaj_plocu(ploca);
+    nacrtaj_plocu((const char* const*)ploca);
     printf("\n\033[1;33m***************************************\033[0m\n");
     printf("\033[1;33m          IZJEDNACENO!                 \033[0m\n");
     printf("\033[1;33m***************************************\033[0m\n");
     strcpy(res.winner, "Izjednaceno");
     save_result(&res);
 
-    // [Koncept 17: Obavezno oslobadanje dinamicki alocirane 2D matrice kod izjednacenog ishoda]
     for (int i = 0; i < 3; i++) free(ploca[i]);
     free(ploca);
-    // [Koncept 18: Sigurno anuliranje pokazivaca na NULL]
     ploca = NULL;
 }
