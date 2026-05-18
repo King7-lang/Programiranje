@@ -32,7 +32,7 @@ static IgracStatistika* ucitaj_sve_igrace(int* broj_igraca) {
 }
 
 // [Koncept 6: Primjena kljucne rijeci static]
-// [Koncept 14: Zastita parametara koristenjem kljucne rijeci const]
+// [Koncept 14: Osiguranje parametara koristenjem kljucne rijeci const]
 static void azuriraj_ili_dodaj(const char* ime, Ishod ishod) {
     // [Koncept 19: Datoteke - otvaranje binarne datoteke u rb+ modu]
     FILE* fp = fopen("igraci.bin", "rb+");
@@ -60,7 +60,6 @@ static void azuriraj_ili_dodaj(const char* ime, Ishod ishod) {
     // [Koncept 1: C & I u CRUID - Kreiranje novog zapisa ako ne postoji u bazi]
     if (!pronaden) {
         if (!(fp = fopen("igraci.bin", "ab"))) {
-            // [Koncept 22: Upravljati pogreskama koristenjem perror()]
             perror("Greska pri otvaranju datoteke");
             return;
         }
@@ -83,6 +82,7 @@ void save_result(const TrenutniRezultat* res) {
     azuriraj_ili_dodaj(res->player2, izjednaceno ? REMI : (p1_pobjednik ? GUBITAK : POBJEDA));
 }
 
+// [Koncept 14: Parametri funkcije usporedbe su osigurani preko const void*]
 static int usporedi_pobjede(const void* a, const void* b) {
     return (((const IgracStatistika*)b)->pobjede - ((const IgracStatistika*)a)->pobjede);
 }
@@ -100,7 +100,6 @@ void display_results() {
     // [Koncept 26: Pokazivaci na funkcije - predavanje funkcije kao argumenta]
     qsort(ljestvica, broj_igraca, sizeof(IgracStatistika), usporedi_pobjede);
 
-    // Plavo-bijeli dizajn tablice rezultata
     printf("\n\033[1;34m------------------------------------------------------\033[0m\n");
     printf("\033[1;36m       LJESTVICA IGRACA (SORTIRANO PO POBJEDAMA)      \033[0m\n");
     printf("\033[1;34m------------------------------------------------------\033[0m\n");
@@ -150,9 +149,9 @@ void delete_single_result(int index) {
     data = NULL;
 }
 
-// [Koncept 1: U u CRUID - Rucni Update odabranog polja unutar postojece strukture]
+
+// [Koncept 14: Osiguranje parametra const char* ime]
 void rucni_update_pobjeda(const char* ime, int nove_pobjede) {
-    // [Koncept 19: Rad s binarnim datotekama kroz citanje i pisanje "rb+"]
     FILE* fp = fopen("igraci.bin", "rb+");
     if (!fp) {
         printf("\033[1;31mDatoteka ne postoji ili se ne moze otvoriti.\033[0m\n");
