@@ -1,24 +1,32 @@
 #pragma once
 
+// Enumeracija definira jasna imena za opcije izbornika, 
+// cime se izbjegava koristenje "magicnih brojeva" i kod postaje citljiviji.
 typedef enum {
-    IZLAZ = 0,
-    CREATE_INSERT,   // C & I: Pokretanje nove igre i insert novih igraca u bazu
-    READ_STATS,      // R: Citanje i pregled ljestvice s qsortom
-    UPDATE_RECORD,   // U: Rucno azuriranje/izmjena statistike nekog igraca
-    DELETE_PLAYER    // D: Brisanje igraca iz datoteke
+    EXIT = 0,
+    CREATE_INSERT,
+    READ_STATS,
+    UPDATE_RECORD,
+    DELETE_PLAYER
 } MenuOpcija;
 
+// Struktura IgracStatistika cuva podatke o pojedinom igracu;
+// koristimo fiksni niz za ime radi jednostavnosti spremanja u binarnu datoteku.
 typedef struct {
     char ime[50];
-    int pobjede;     // [Koncept 2: Primitivni tipovi podataka - cijeli brojevi]
+    int pobjede;
     int porazi;
     int odigrano;
 } IgracStatistika;
 
+// Struktura za privremeno pracenje rezultata trenutne partije 
+// prije nego se podaci trajno pohrane u datoteku.
 typedef struct {
     char player1[50];
     char player2[50];
     char winner[50];
 } TrenutniRezultat;
 
+// Deklaracija glavne funkcije igre; koristenje ovakvog header-a 
+// omogucuje modularnost i povezivanje s main.c datotekom.
 void play_game();
