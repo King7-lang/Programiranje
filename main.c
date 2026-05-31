@@ -7,13 +7,14 @@
 int main() {
     int input;
 
+    // Inicijalizacija izbornika; koristimo MenuOpcija (enum) radi jasnoce koda.
     MenuOpcija choice = CREATE_INSERT;
 
-    // [Koncept 10: Izbornik / podizbornici preko petlje]
+    // Glavna petlja programa koja osigurava da se program izvrsava dok korisnik ne odabere IZLAZ.
     do {
-        // Vizualno uredenje glavnog izbornika pomocu ANSI boja
+
         printf("\n\033[1;33m=====================================\033[0m\n");
-        printf("\033[1;36m       KRIZIC KRUZIC          \033[0m\n");
+        printf("\033[1;36m         KRIZIC KRUZIC           \033[0m\n");
         printf("\033[1;33m=====================================\033[0m\n");
         printf("\033[1;32m 1.\033[0m New game\n");
         printf("\033[1;32m 2.\033[0m Ranking overview\n");
@@ -23,6 +24,8 @@ int main() {
         printf("\033[1;33m-------------------------------------\033[0m\n");
         printf("Choice: ");
 
+        // Robustan unos podataka: provjera je li korisnik unio broj; 
+        // ako nije, cistimo ulazni spremnik (buffer) kako bismo sprijecili beskonacnu petlju.
         if (scanf("%d", &input) != 1) {
             while (getchar() != '\n');
             continue;
@@ -30,14 +33,15 @@ int main() {
 
         choice = (MenuOpcija)input;
 
-        // [Koncept 11: Kod izbornika koristiti enum tipove unutar switch-a]
+        // Upravljacka logika: delegira zadatke na druge datoteke (game.c ili file_handler.c) 
+        // ovisno o odabiru korisnika.
         switch (choice) {
         case CREATE_INSERT:
             play_game();
             break;
 
         case READ_STATS:
-            system("cls"); // Cisti ekran prije ispisa ljestvice radi preglednosti
+            system("cls");
             display_results();
             break;
 
@@ -51,7 +55,7 @@ int main() {
             printf("Unesi NOVI ukupan broj pobjeda za ovog igraca: ");
             scanf("%d", &broj_pobjeda);
 
-            
+            // Poziv CRUD operacije azuriranja podataka.
             rucni_update_pobjeda(ime_za_update, broj_pobjeda);
             break;
         }
@@ -62,11 +66,12 @@ int main() {
             int idx;
             printf("\nUnesi redni broj igraca za brisanje: ");
             scanf("%d", &idx);
-            // [Koncept 1: D u CRUID - Delete zapisa iz datoteke]
+
+            // Poziv CRUD operacije brisanja zapisa.
             delete_single_result(idx);
             break;
 
-        case IZLAZ:
+        case EXIT:
             printf("\n\033[1;31mIzlaz iz programa...\033[0m\n");
             break;
 
@@ -75,7 +80,7 @@ int main() {
             break;
         }
 
-    } while (choice != IZLAZ);
+    } while (choice != EXIT);
 
     return 0;
 }
