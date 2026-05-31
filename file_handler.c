@@ -4,21 +4,26 @@
 #include <string.h>
 #include "file_handler.h"
 
-// [Koncept 4: Primjena typedef s enum tipovima]
+// Koristim enumeraciju za jasno razlikovanje ishoda igre, 
+// što kod cini citljivijim i manje podloznim greskama u usporedbama.
 typedef enum { GUBITAK, POBJEDA, REMI } Ishod;
 
-// [Koncept 16: Koristiti dinamicko zauzimanje memorije za slozene tipove]
+// Funkcija ucitava podatke iz binarne datoteke u dinamicki alociran niz struktura.
+// Koristim 'static' kako bih ogranicio vidljivost funkcije na ovu datoteku (enkapsulacija).
 static IgracStatistika* ucitaj_sve_igrace(int* broj_igraca) {
-    FILE* fp = fopen("igraci.bin", "rb");
+    FILE* fp = fopen("igraci.bin", "rb"); // Otvaram datoteku u binarnom modu za sigurno citanje struktura.
     if (!fp) return NULL;
 
     IgracStatistika* ljestvica = NULL, temp;
     *broj_igraca = 0;
 
+    // Dinamicki alociram memoriju (realloc) kako bih mogao ucitati proizvoljan broj igraca 
+    // koji se nalaze u bazi, cime osiguravam fleksibilnost programa.
     while (fread(&temp, sizeof(IgracStatistika), 1, fp)) {
-        // [Koncept 17: Koristiti ugradenu funkciju realloc()]
+
         IgracStatistika* ptr = (IgracStatistika*)realloc(ljestvica, (*broj_igraca + 1) * sizeof(IgracStatistika));
         if (!ptr) {
+            // U slucaju neuspjele alokacije, cistim memoriju i zatvaram datoteku kako ne bi bilo curenja.
             perror("Greska pri alokaciji");
             free(ljestvica);
             fclose(fp);
@@ -27,19 +32,17 @@ static IgracStatistika* ucitaj_sve_igrace(int* broj_igraca) {
         ljestvica = ptr;
         ljestvica[(*broj_igraca)++] = temp;
     }
-    fclose(fp);
+    fclose(fp); // Obavezno zatvaranje datoteke radi oslobadanja resursa operacijskog sustava.
     return ljestvica;
 }
 
-// [Koncept 6: Primjena kljucne rijeci static]
-// [Koncept 14: Osiguranje parametara koristenjem kljucne rijeci const]
 static void azuriraj_ili_dodaj(const char* ime, Ishod ishod) {
-    // [Koncept 19: Datoteke - otvaranje binarne datoteke u rb+ modu]
+    // Implementiram CRUD princip: trazim zapis u datoteci za azuriranje, 
+    // a ako ga nema, kreiram novi zapis na kraju datoteke.
     FILE* fp = fopen("igraci.bin", "rb+");
     IgracStatistika temp;
     int pronaden = 0;
 
-    // [Koncept 19: Obavezna provjera pokazivaca na datoteku prije koristenja]
     if (fp != NULL) {
         while (fread(&temp, sizeof(IgracStatistika), 1, fp)) {
             if (strcmp(temp.ime, ime) == 0) {
@@ -47,18 +50,19 @@ static void azuriraj_ili_dodaj(const char* ime, Ishod ishod) {
                 if (ishod == POBJEDA) temp.pobjede++;
                 else if (ishod == GUBITAK) temp.porazi++;
 
-                // [Koncept 20: Koristiti funkciju fseek za pozicioniranje u datoteci]
+                // Pomocu fseek pomicem pokazivac unutar datoteke tocno na pocetak pronadenog zapisa,
+                // sto mi omogucuje efikasno prepisivanje starog podatka novim bez stvaranja kopije datoteke.
                 fseek(fp, -(long)sizeof(IgracStatistika), SEEK_CUR);
                 fwrite(&temp, sizeof(IgracStatistika), 1, fp);
                 pronaden = 1;
                 break;
             }
         }
-        fclose(fp); // [Koncept 19: Obavezno zatvaranje datoteke]
+        fclose(fp);
     }
 
-    // [Koncept 1: C & I u CRUID - Kreiranje novog zapisa ako ne postoji u bazi]
     if (!pronaden) {
+        // Ako igrac ne postoji, otvaram datoteku u append modu ("ab") za dodavanje novog igraca.
         if (!(fp = fopen("igraci.bin", "ab"))) {
             perror("Greska pri otvaranju datoteke");
             return;
@@ -72,7 +76,8 @@ static void azuriraj_ili_dodaj(const char* ime, Ishod ishod) {
     }
 }
 
-// [Koncept 14: Zastita parametara strukture koristenjem kljucne rijeci const]
+// Parametar 'res' je oznacen kao 'const' kako bih osigurao da funkcija 
+// samo cita podatke iz strukture bez opasnosti da ih nehotice izmijenim.
 void save_result(const TrenutniRezultat* res) {
     if (!res) return;
     int izjednaceno = (strcmp(res->winner, "Izjednaceno") == 0);
@@ -82,7 +87,8 @@ void save_result(const TrenutniRezultat* res) {
     azuriraj_ili_dodaj(res->player2, izjednaceno ? REMI : (p1_pobjednik ? GUBITAK : POBJEDA));
 }
 
-// [Koncept 14: Parametri funkcije usporedbe su osigurani preko const void*]
+// Koristim pokazivace na funkciju unutar qsort-a kako bih definirao 
+// vlastito pravilo sortiranja (po broju pobjeda).
 static int usporedi_pobjede(const void* a, const void* b) {
     return (((const IgracStatistika*)b)->pobjede - ((const IgracStatistika*)a)->pobjede);
 }
@@ -96,8 +102,7 @@ void display_results() {
         return;
     }
 
-    // [Koncept 23: Sortiranje – obavezna primjena ugradene qsort() funkcije]
-    // [Koncept 26: Pokazivaci na funkcije - predavanje funkcije kao argumenta]
+    // Pozivam ugradenu qsort funkciju za brzo sortiranje niza podataka u memoriji.
     qsort(ljestvica, broj_igraca, sizeof(IgracStatistika), usporedi_pobjede);
 
     printf("\n\033[1;34m------------------------------------------------------\033[0m\n");
@@ -111,8 +116,9 @@ void display_results() {
     }
     printf("\033[1;34m------------------------------------------------------\033[0m\n");
 
+    // Nakon prikaza, eksplicitno oslobadam alociranu memoriju i postavljam pokazivac na NULL
+    // kako bih izbjegao "visece" pokazivace (dangling pointers).
     free(ljestvica);
-    // [Koncept 18: Sigurno brisanje memorije - anuliranje pokazivaca na NULL]
     ljestvica = NULL;
 }
 
@@ -125,7 +131,8 @@ void delete_single_result(int index) {
         return;
     }
 
-    // [Koncept 1: D u CRUID - Potpuno brisanje odabranog zapisa]
+    // Implementacija brisanja iz binarne datoteke: kreiram novu datoteku, 
+    // prepisem sve podatke osim onog kojeg zelim obrisati.
     if (index >= 1 && index <= count) {
         FILE* fp = fopen("igraci.bin", "wb");
         if (fp != NULL) {
@@ -145,12 +152,9 @@ void delete_single_result(int index) {
     }
 
     free(data);
-    // [Koncept 18: Anuliranje pokazivaca na NULL]
     data = NULL;
 }
 
-
-// [Koncept 14: Osiguranje parametra const char* ime]
 void rucni_update_pobjeda(const char* ime, int nove_pobjede) {
     FILE* fp = fopen("igraci.bin", "rb+");
     if (!fp) {
@@ -168,7 +172,7 @@ void rucni_update_pobjeda(const char* ime, int nove_pobjede) {
                 temp.odigrano = temp.pobjede + temp.porazi;
             }
 
-            // [Koncept 20: Koristiti funkciju fseek za vracanje pozicije unatrag]
+            // Azuriram zapis na izvornoj poziciji u binarnoj datoteci.
             fseek(fp, -(long)sizeof(IgracStatistika), SEEK_CUR);
             fwrite(&temp, sizeof(IgracStatistika), 1, fp);
             pronaden = 1;
